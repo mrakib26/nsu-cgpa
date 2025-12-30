@@ -3,164 +3,206 @@
 <head>
 <meta charset="UTF-8">
 <title>NSU CGPA Calculator</title>
+
 <style>
-body {
+body{
   font-family: Arial, sans-serif;
-  background: #f4f6f8;
-  margin: 0;
-  padding: 20px;
+  background:#f4f6f8;
+  padding:20px;
 }
-.container {
-  max-width: 900px;
-  margin: auto;
-  background: white;
-  padding: 20px;
-  border-radius: 8px;
+.container{
+  max-width:1000px;
+  margin:auto;
+  background:white;
+  padding:20px;
+  border-radius:8px;
 }
-h2 { margin-top: 0; }
-button {
-  padding: 8px 14px;
-  cursor: pointer;
+button{
+  padding:6px 12px;
+  margin:5px 0;
+  cursor:pointer;
 }
-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 15px;
+table{
+  width:100%;
+  border-collapse:collapse;
+  margin-top:10px;
 }
-th, td {
-  border: 1px solid #ccc;
-  padding: 8px;
-  text-align: center;
+th,td{
+  border:1px solid #ccc;
+  padding:6px;
+  text-align:center;
 }
-.modal {
-  display: none;
-  position: fixed;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0,0,0,0.4);
+.modal{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.4);
 }
-.modal-content {
-  background: white;
-  padding: 20px;
-  width: 320px;
-  margin: 100px auto;
-  border-radius: 6px;
+.modal-content{
+  background:white;
+  width:350px;
+  margin:80px auto;
+  padding:20px;
+  border-radius:6px;
 }
-input {
-  width: 100%;
-  padding: 6px;
-  margin-bottom: 8px;
+input,select{
+  width:100%;
+  padding:6px;
+  margin-bottom:8px;
+}
+.sem-box{
+  border:1px solid #ddd;
+  padding:12px;
+  margin-top:15px;
 }
 </style>
 </head>
 
 <body>
 <div class="container">
-  <h2>NSU CGPA Calculator</h2>
+<h2>NSU CGPA Calculator</h2>
 
-  <p><b>Semester GPA:</b> <span id="semGPA">0.00</span></p>
-  <p><b>Total CGPA:</b> <span id="totalCGPA">0.00</span></p>
+<button onclick="addSemester()">➕ Add Semester</button>
+<button onclick="addPreviousCGPA()">➕ Add Previous CGPA</button>
 
-  <button onclick="openModal()">Add Course</button>
+<h3>Total CGPA: <span id="totalCGPA">0.00</span></h3>
 
-  <table>
-    <thead>
-      <tr>
-        <th>Course</th>
-        <th>Faculty</th>
-        <th>Section</th>
-        <th>Credit</th>
-        <th>Marks</th>
-        <th>Grade</th>
-      </tr>
-    </thead>
-    <tbody id="courseTable"></tbody>
-  </table>
+<div id="semesters"></div>
 </div>
 
-<div class="modal" id="modal">
+<!-- Course Modal -->
+<div class="modal" id="courseModal">
   <div class="modal-content">
     <h3>Add Course</h3>
-    <input id="course" placeholder="Course Code">
-    <input id="faculty" placeholder="Faculty Code">
+    <input id="cCode" placeholder="Course Code">
+    <input id="fCode" placeholder="Faculty Code">
     <input id="section" placeholder="Section">
     <input id="credit" type="number" placeholder="Credit">
     <input id="marks" type="number" placeholder="Marks">
-    <button onclick="addCourse()">OK</button>
+    <button onclick="saveCourse()">Save</button>
     <button onclick="closeModal()">Cancel</button>
   </div>
 </div>
 
 <script>
-let courses = JSON.parse(localStorage.getItem("courses")) || [];
+let data = JSON.parse(localStorage.getItem("nsuData")) || {
+  semesters:[],
+  prevCGPA:[]
+};
+let currentSem = null;
 
-function gradeFromMarks(m) {
-  if (m >= 90) return ["A", 4.0];
-  if (m >= 85) return ["A-", 3.7];
-  if (m >= 80) return ["B+", 3.3];
-  if (m >= 75) return ["B", 3.0];
-  if (m >= 70) return ["B-", 2.7];
-  if (m >= 65) return ["C+", 2.3];
-  if (m >= 60) return ["C", 2.0];
-  if (m >= 50) return ["D", 1.0];
-  return ["F", 0.0];
+function gradeFromMarks(m){
+  if(m>=90) return ["A",4.0];
+  if(m>=85) return ["A-",3.7];
+  if(m>=80) return ["B+",3.3];
+  if(m>=75) return ["B",3.0];
+  if(m>=70) return ["B-",2.7];
+  if(m>=65) return ["C+",2.3];
+  if(m>=60) return ["C",2.0];
+  if(m>=50) return ["D",1.0];
+  return ["F",0.0];
 }
 
-function openModal() {
-  document.getElementById("modal").style.display = "block";
+function addSemester(){
+  let name = prompt("Semester Name (eg: Spring 2025)");
+  if(!name) return;
+  data.semesters.push({name,courses:[]});
+  save();
 }
 
-function closeModal() {
-  document.getElementById("modal").style.display = "none";
+function addPreviousCGPA(){
+  let cg = prompt("Previous CGPA");
+  let cr = prompt("Total Credits");
+  if(!cg||!cr) return;
+  data.prevCGPA.push({cgpa:parseFloat(cg),credits:parseFloat(cr)});
+  save();
 }
 
-function addCourse() {
-  let marks = parseFloat(document.getElementById("marks").value);
-  let [grade, point] = gradeFromMarks(marks);
+function openModal(i){
+  currentSem = i;
+  document.getElementById("courseModal").style.display="block";
+}
 
-  let course = {
-    course: document.getElementById("course").value,
-    faculty: document.getElementById("faculty").value,
-    section: document.getElementById("section").value,
-    credit: parseFloat(document.getElementById("credit").value),
+function closeModal(){
+  document.getElementById("courseModal").style.display="none";
+}
+
+function saveCourse(){
+  let marks = +marksInput.value;
+  let [g,p] = gradeFromMarks(marks);
+  data.semesters[currentSem].courses.push({
+    course:cCode.value,
+    faculty:fCode.value,
+    section:section.value,
+    credit:+credit.value,
     marks,
-    grade,
-    point
-  };
-
-  courses.push(course);
-  localStorage.setItem("courses", JSON.stringify(courses));
-  render();
+    grade:g,
+    point:p
+  });
   closeModal();
+  save();
 }
 
-function render() {
-  let table = document.getElementById("courseTable");
-  table.innerHTML = "";
+function deleteCourse(si,ci){
+  data.semesters[si].courses.splice(ci,1);
+  save();
+}
 
-  let totalPoints = 0;
-  let totalCredits = 0;
+function calculate(){
+  let totalPoints=0,totalCredits=0;
 
-  courses.forEach(c => {
-    let row = `<tr>
-      <td>${c.course}</td>
-      <td>${c.faculty}</td>
-      <td>${c.section}</td>
-      <td>${c.credit}</td>
-      <td>${c.marks}</td>
-      <td>${c.grade}</td>
-    </tr>`;
-    table.innerHTML += row;
-
-    totalPoints += c.point * c.credit;
-    totalCredits += c.credit;
+  data.prevCGPA.forEach(p=>{
+    totalPoints+=p.cgpa*p.credits;
+    totalCredits+=p.credits;
   });
 
-  let gpa = totalCredits ? (totalPoints / totalCredits).toFixed(2) : "0.00";
-  document.getElementById("semGPA").innerText = gpa;
-  document.getElementById("totalCGPA").innerText = gpa;
+  data.semesters.forEach(s=>{
+    let sp=0,sc=0;
+    s.courses.forEach(c=>{
+      sp+=c.point*c.credit;
+      sc+=c.credit;
+    });
+    s.gpa = sc? (sp/sc):0;
+    totalPoints+=sp;
+    totalCredits+=sc;
+  });
+
+  document.getElementById("totalCGPA").innerText =
+    totalCredits ? (totalPoints/totalCredits).toFixed(2):"0.00";
+}
+
+function render(){
+  let box=document.getElementById("semesters");
+  box.innerHTML="";
+  data.semesters.forEach((s,i)=>{
+    let div=document.createElement("div");
+    div.className="sem-box";
+    div.innerHTML=`
+      <h3>${s.name} | GPA: ${(s.gpa||0).toFixed(2)}</h3>
+      <button onclick="openModal(${i})">Add Course</button>
+      <table>
+        <tr><th>Course</th><th>Faculty</th><th>Sec</th>
+        <th>Credit</th><th>Marks</th><th>Grade</th><th>X</th></tr>
+        ${s.courses.map((c,j)=>`
+          <tr>
+            <td>${c.course}</td>
+            <td>${c.faculty}</td>
+            <td>${c.section}</td>
+            <td>${c.credit}</td>
+            <td>${c.marks}</td>
+            <td>${c.grade}</td>
+            <td><button onclick="deleteCourse(${i},${j})">❌</button></td>
+          </tr>`).join("")}
+      </table>
+    `;
+    box.appendChild(div);
+  });
+  calculate();
+}
+
+function save(){
+  localStorage.setItem("nsuData",JSON.stringify(data));
+  render();
 }
 
 render();
